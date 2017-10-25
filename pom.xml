@@ -1,0 +1,276 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.newtank.libra</groupId>
+  <artifactId>children-insurance-backend</artifactId>
+  <packaging>pom</packaging>
+  <version>1.0-SNAPSHOT</version>
+  <modules>
+    <module>children-insurance-site</module>
+  </modules>
+  <name>children-insurance-backend Maven Webapp</name>
+  <url>http://maven.apache.org</url>
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>1.5.7.RELEASE</version>
+    <relativePath/>
+  </parent>
+
+  <properties>
+    <project.build.jdk.version>1.8</project.build.jdk.version>
+    <project.build.groovy.version>2.4.12</project.build.groovy.version>
+    <project.build.source.encoding>UTF-8</project.build.source.encoding>
+
+    <io.springfox.swagger.version>2.7.0</io.springfox.swagger.version>
+
+    <org.apache.commons.lang3.version>3.6</org.apache.commons.lang3.version>
+    <org.apache.commons.io.version>2.4</org.apache.commons.io.version>
+    <org.apache.commons.fileupload.version>1.3.3</org.apache.commons.fileupload.version>
+    <org.apache.commons.beanutils.version>1.9.3</org.apache.commons.beanutils.version>
+    <org.apache.commons.collections.version>3.2.2</org.apache.commons.collections.version>
+    <org.apache.commons.codec.version>1.10</org.apache.commons.codec.version>
+
+    <org.codehaus.jackson.mapper.version>1.9.13</org.codehaus.jackson.mapper.version>
+
+    <com.google.guava.version>23.0</com.google.guava.version>
+    <com.google.zxing.core.version>3.3.0</com.google.zxing.core.version>
+
+    <com.alibaba.druid.version>1.1.3</com.alibaba.druid.version>
+    <com.mysql.jdbc.version>5.1.44</com.mysql.jdbc.version>
+    <org.ehcache.version>3.4.0</org.ehcache.version>
+
+    <com.aliyun.oss.version>2.8.1</com.aliyun.oss.version>
+    <com.huize.qixin.openapi.version>1.0</com.huize.qixin.openapi.version>
+
+    <!-- Maven Plugins -->
+    <plugins.maven.compiler.version>3.6.2</plugins.maven.compiler.version>
+    <plugins.maven.surefire.version>2.20</plugins.maven.surefire.version>
+    <plugins.maven.jar.version>3.0.2</plugins.maven.jar.version>
+    <plugins.maven.war.version>2.6</plugins.maven.war.version>
+    <plugins.maven.buildnumber.version>1.4</plugins.maven.buildnumber.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.springfox</groupId>
+      <artifactId>springfox-swagger2</artifactId>
+      <version>${io.springfox.swagger.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.springfox</groupId>
+      <artifactId>springfox-swagger-ui</artifactId>
+      <version>${io.springfox.swagger.version}</version>
+    </dependency>
+
+    <!-- Spring Boot -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-aop</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-redis</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-mail</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-batch</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- Utils -->
+    <!-- Apache-Commons -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>${org.apache.commons.lang3.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>${org.apache.commons.io.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-fileupload</groupId>
+      <artifactId>commons-fileupload</artifactId>
+      <version>${org.apache.commons.fileupload.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-collections</groupId>
+      <artifactId>commons-collections</artifactId>
+      <version>${org.apache.commons.collections.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-beanutils</groupId>
+      <artifactId>commons-beanutils</artifactId>
+      <version>${org.apache.commons.beanutils.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-codec</groupId>
+      <artifactId>commons-codec</artifactId>
+      <version>${org.apache.commons.codec.version}</version>
+    </dependency>
+
+    <!-- Google-Java -->
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>${com.google.guava.version}</version>
+    </dependency>
+    <!-- QR Utils -->
+    <dependency>
+      <groupId>com.google.zxing</groupId>
+      <artifactId>core</artifactId>
+      <version>${com.google.zxing.core.version}</version>
+    </dependency>
+
+    <!-- Database -->
+    <dependency>
+      <groupId>com.alibaba</groupId>
+      <artifactId>druid</artifactId>
+      <version>${com.alibaba.druid.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.alibaba</groupId>
+      <artifactId>druid-spring-boot-starter</artifactId>
+      <version>${com.alibaba.druid.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>mysql</groupId>
+      <artifactId>mysql-connector-java</artifactId>
+      <version>${com.mysql.jdbc.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- EhCache -->
+    <dependency>
+      <groupId>org.ehcache</groupId>
+      <artifactId>ehcache</artifactId>
+      <version>${org.ehcache.version}</version>
+    </dependency>
+
+    <!-- Data Utils -->
+    <dependency>
+      <groupId>org.codehaus.jackson</groupId>
+      <artifactId>jackson-mapper-asl</artifactId>
+      <version>${org.codehaus.jackson.mapper.version}</version>
+    </dependency>
+
+
+    <!-- Http Utils -->
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpclient</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpclient-cache</artifactId>
+      <version>${httpclient.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpcore</artifactId>
+    </dependency>
+
+    <!-- lombok annotation -->
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.aliyun.oss</groupId>
+      <artifactId>aliyun-sdk-oss</artifactId>
+      <version>${com.aliyun.oss.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.huize.qixin</groupId>
+      <artifactId>qixin-openapi-common</artifactId>
+      <version>${com.huize.qixin.openapi.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.huize.qixin</groupId>
+      <artifactId>qixin-openapi-sdk</artifactId>
+      <version>${com.huize.qixin.openapi.version}</version>
+    </dependency>
+
+    <!-- Test -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>${plugins.maven.compiler.version}</version>
+          <configuration>
+            <encoding>${project.build.source.encoding}</encoding>
+            <source>${project.build.jdk.version}</source>
+            <target>${project.build.jdk.version}</target>
+            <showWarnings>true</showWarnings>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>${plugins.maven.surefire.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-war-plugin</artifactId>
+          <version>${plugins.maven.war.version}</version>
+          <configuration>
+            <failOnMissingWebXml>false</failOnMissingWebXml>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>${plugins.maven.jar.version}</version>
+          <configuration>
+            <archive>
+              <addMavenDescriptor>false</addMavenDescriptor>
+            </archive>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>buildnumber-maven-plugin</artifactId>
+          <version>${plugins.maven.buildnumber.version}</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+
+</project>
