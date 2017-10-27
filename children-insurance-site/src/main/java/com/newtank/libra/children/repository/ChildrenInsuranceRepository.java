@@ -8,6 +8,8 @@ import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 /**
  * Created by looper on 2017/10/26.
  */
@@ -19,4 +21,6 @@ public interface ChildrenInsuranceRepository extends CrudRepository<ChildrenInsu
   void updateExpiredOrder();
 
   ChildrenInsuarnce findByInsureNum(String insureNum);
+
+  List<ChildrenInsuarnce> findByMobile(String mobile);
 }

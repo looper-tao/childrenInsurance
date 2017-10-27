@@ -1,8 +1,14 @@
 package com.newtank.libra.children.controller;
 
+import com.google.common.base.Function;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.collect.Lists;
 import com.huize.qixin.api.resp.insure.InsureResp;
 import com.newtank.libra.children.conf.KaptchaConfig;
+import com.newtank.libra.children.controller.request.HealthStateReq;
 import com.newtank.libra.children.controller.request.InsureReq;
+import com.newtank.libra.children.controller.response.ChildrenInsuarnceResp;
 import com.newtank.libra.children.controller.response.ChildrenInsurancePayResp;
 import com.newtank.libra.children.controller.response.QixinNotifyResultResp;
 import com.newtank.libra.children.entity.ChildrenInsuarnce;
@@ -13,6 +19,7 @@ import com.newtank.libra.children.service.sms.SmsSendService;
 import com.newtank.libra.children.utils.HttpUtil;
 import com.newtank.libra.children.utils.JsonUtil;
 import com.qixin.openapi.model.common.CommonResult;
+import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +29,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.ConstraintViolation;
@@ -29,9 +37,8 @@ import javax.validation.Validation;
 import javax.validation.Validator;
 import java.io.UnsupportedEncodingException;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by looper on 2017/10/25.
@@ -51,7 +58,7 @@ public class ChildrenInsuranceController {
 
   @Value("${isDebug}")
   private Boolean isDebug;
-  @Value("${love.vcode.sign-name}")
+  @Value("${children.vcode.sign-name}")
   private String vcodeSignName;
 
   @Autowired
@@ -67,8 +74,24 @@ public class ChildrenInsuranceController {
 
   private KaptchaCounter vcodeKaptchaCounter;
 
+  private static Map<String,Long> GENS = new HashMap<>();
+
+  static {
+    GENS.put("10万元", (long) 1600);
+    GENS.put("20万元", (long) 3200);
+    GENS.put("30万元", (long) 4800);
+    GENS.put("40万元", (long) 6400);
+    GENS.put("50万元", (long) 8000);
+  }
+
+  //token值缓存
+  private Cache<String, String> tokenCache = CacheBuilder.newBuilder()
+      .maximumSize(50000L)
+      .expireAfterWrite(300, TimeUnit.SECONDS)
+      .build();
+
   @Bean(name = "vcodeKaptchaConfig")
-  @ConfigurationProperties(prefix = "love.vcode.kaptcha")
+  @ConfigurationProperties(prefix = "children.vcode.kaptcha")
   public KaptchaConfig getVcodeKaptchaConfig() {
     return new KaptchaConfig();
   }
@@ -82,7 +105,7 @@ public class ChildrenInsuranceController {
   /**
    * 默认试算
    */
-  @RequestMapping(value = "defaultTrial",method = RequestMethod.POST)
+  @RequestMapping(value = "defaultTrial", method = RequestMethod.POST)
   public String defaultTrial() throws OperationFailedException {
     return JsonUtil.toJson(childrenInsuranceService.defaultTrial());
   }
@@ -90,54 +113,62 @@ public class ChildrenInsuranceController {
   /**
    * 获取健康告知
    */
-  @RequestMapping(value = "healthStatement/{money}",method = RequestMethod.POST)
-  public String healthStatement(@PathVariable int money) throws OperationFailedException {
-    String geneParamValue = money + "万元";
+  @RequestMapping(value = "healthStatement", method = RequestMethod.POST)
+  public String healthStatement(@RequestBody HealthStateReq healthStateReq) throws OperationFailedException {
+    String geneParamValue = healthStateReq.getMoney();
     return childrenInsuranceService.healthStatement(geneParamValue);
   }
 
 
+  //TODO 弃用
+
   /**
    * 提交健康告知
-   * @param money
-   * @param controlValue
+   *
+   * @param healthStateReq
    * @return
    * @throws OperationFailedException
    */
-  @RequestMapping(value = "submitHealthState/{money}/{controlValue}",method = RequestMethod.POST)
-  public String submitHealthState(@PathVariable int money,@PathVariable int controlValue) throws OperationFailedException {
-    if(controlValue != 0){
+  @RequestMapping(value = "submitHealthState", method = RequestMethod.POST)
+  public String submitHealthState(@RequestBody HealthStateReq healthStateReq) throws OperationFailedException {
+    if (healthStateReq.getControlValue() != 0) {
       throw new OperationFailedException("健康告知验证不通过");
     }
-    String geneParamValue = money + "万元";
+    String geneParamValue = healthStateReq.getMoney();
     return JsonUtil.toJson(childrenInsuranceService.submitHealthState(geneParamValue));
   }
 
 
   /**
    * 存储投保信息并投保在线支付
+   *
    * @param insureReq 投保信息
    */
-  @RequestMapping(value = "insure",method = RequestMethod.POST)
+  @RequestMapping(value = "insure", method = RequestMethod.POST)
   public ChildrenInsurancePayResp insure(@RequestBody InsureReq insureReq) throws OperationFailedException {
-    LOGGER.info("InsureReq = "+JsonUtil.toJson(insureReq));
     Set<ConstraintViolation<InsureReq>> constraintViolationSet = VALIDATOR.validate(insureReq);
     if (constraintViolationSet.size() > 0) {
       throw new OperationFailedException(constraintViolationSet.iterator().next().getMessage());
     }
 
     isTimeToInPay();
+    if(null == insureReq.getGenes() || null == GENS.get(insureReq.getGenes())){
+      throw new OperationFailedException("投保金额有问题");
+    }
 
     //验证码验证
     smsSendService.verify(insureReq.getMobile(), insureReq.getVcode());
+    //获取token
+    String token = getToken(insureReq.getMobile());
+
     //存储投保信息并投保
-    CommonResult<InsureResp> insureRespCommonResult = childrenInsuranceService.insureAndSave(insureReq.buildChildrenInsuarnce());
+    CommonResult<InsureResp> insureRespCommonResult = childrenInsuranceService.insureAndSave(insureReq.buildChildrenInsuarnce(),GENS.get(insureReq.getGenes()));
     ChildrenInsuarnce childrenInsuarnce = childrenInsuranceRepository.findByInsureNum(insureRespCommonResult.getData().getInsureNum());
     //验证码删除
     smsSendService.delete(insureReq.getMobile());
     //在线支付
     childrenInsuarnce = childrenInsuranceService.tryPay(childrenInsuarnce);
-    return new ChildrenInsurancePayResp(childrenInsuarnce.getInsureNum(),childrenInsuarnce.getPayUrl());
+    return new ChildrenInsurancePayResp(childrenInsuarnce.getInsureNum(), childrenInsuarnce.getPayUrl(),token);
   }
 
   /**
@@ -157,6 +188,7 @@ public class ChildrenInsuranceController {
 
   /**
    * 在线支付
+   *
    * @param insureNum 投保单号
    * @return
    * @throws OperationFailedException
@@ -186,7 +218,7 @@ public class ChildrenInsuranceController {
    * @param insureNum 投保单号
    */
   @RequestMapping(value = "download/{insureNum}")
-  public String download(@PathVariable String insureNum) {
+  public String download(@PathVariable String insureNum) throws OperationFailedException {
     return childrenInsuranceService.download(insureNum);
   }
 
@@ -238,5 +270,93 @@ public class ChildrenInsuranceController {
     smsSendService.vcodeSend(mobileNum, vcodeSignName);
     vcodeKaptchaCounter.add(clientIp);
   }
+
+
+  /**
+   * 登录 获取token
+   *
+   * @param mobile 手机号
+   * @param vcode  验证码
+   * @return
+   * @throws OperationFailedException
+   */
+  @RequestMapping(value = "login")
+  public String login(String mobile, String vcode) throws OperationFailedException {
+    //验证码验证
+    smsSendService.verify(mobile, vcode);
+
+    String token = getToken(mobile);
+
+    smsSendService.delete(mobile);
+    return token;
+  }
+
+  /**
+   * 获取token
+   *
+   * @return
+   */
+  private String getToken(String mobile) {
+    //验证成功后 提供登录的token
+    String token = RandomStringUtils.randomAlphanumeric(16);
+    tokenCache.put(token, mobile);
+
+    return token;
+  }
+
+
+  /**
+   * 获取订单列表
+   *
+   * @param token 登录验证
+   * @return
+   * @throws OperationFailedException
+   */
+  @RequestMapping(value = "list")
+  public List<ChildrenInsuarnceResp> listChildrenInsuarnce(String token) throws OperationFailedException {
+    LOGGER.info("token = "+token+"      "+tokenCache.getIfPresent(token));
+    if (null == token || null == tokenCache.getIfPresent(token)) {
+      throw new OperationFailedException("请登录");
+    }
+
+    String mobile = tokenCache.getIfPresent(token);
+    List<ChildrenInsuarnce> childrenInsuarnceList = childrenInsuranceRepository.findByMobile(mobile);
+    if (null == childrenInsuarnceList) {
+      return null;
+    }
+
+    return Lists.transform(childrenInsuarnceList, new Function<ChildrenInsuarnce, ChildrenInsuarnceResp>() {
+      @Nullable
+      @Override
+      public ChildrenInsuarnceResp apply(@Nullable ChildrenInsuarnce loveInsurance) {
+        return new ChildrenInsuarnceResp(loveInsurance);
+      }
+    });
+  }
+
+
+  /**
+   * 根据订单号查找订单
+   *
+   * @param insureNum 订单号
+   * @param token     登录验证
+   * @return
+   * @throws OperationFailedException
+   */
+  @RequestMapping(value = "get")
+  public ChildrenInsuarnceResp getByInsureNum(String insureNum, String token) throws OperationFailedException {
+    if (null == token || null == tokenCache.getIfPresent(token)) {
+      throw new OperationFailedException("请登录");
+    }
+
+    String mobile = tokenCache.getIfPresent(token);
+    ChildrenInsuarnce childrenInsuarnce = childrenInsuranceRepository.findByInsureNum(insureNum);
+    if (!mobile.equals(childrenInsuarnce.getMobile())) {
+      throw new OperationFailedException("无权查看该订单");
+    }
+
+    return new ChildrenInsuarnceResp(childrenInsuarnce);
+  }
+
 
 }

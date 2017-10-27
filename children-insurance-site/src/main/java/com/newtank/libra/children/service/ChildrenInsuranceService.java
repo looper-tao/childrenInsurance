@@ -28,11 +28,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by looper on 2017/10/25.
@@ -45,11 +43,25 @@ public class ChildrenInsuranceService extends QiXinOpenApiService {
   @Autowired
   private ChildrenInsuranceRepository childrenInsuranceRepository;
 
+  private static final int HEALTHYID = 274;
+  private static final int MODULEID = 157;
+  private static final int ANSWERID = 509;
+  private static final String PROTECTITEMID = "2383";
+  private static final int RESPCODE = 0;
+
+  private static Map<Integer, Integer> QUESTIONS = new HashMap<>();
+
+  static {
+    for (int questionId = 953; questionId <= 960; questionId++) {
+      QUESTIONS.put(questionId, questionId - 952);
+    }
+  }
+
   @Value("${isDebug}")
   private Boolean isDebug;
 
   @Bean(name = "childrenInsuranceConfig")
-  @ConfigurationProperties(prefix = "huize.qixin.love")
+  @ConfigurationProperties(prefix = "huize.qixin.children")
   public QiXinInsuranceConfig childrenInsuranceConfig() {
     return new QiXinInsuranceConfig();
   }
@@ -62,11 +74,11 @@ public class ChildrenInsuranceService extends QiXinOpenApiService {
     defaultTrial.setCaseCode(childrenInsuranceConfig.getCaseCode());
 
     CommonResult<TrialResp> trialRespCommonResult = operation.defaultTrial(defaultTrial);
-    if(null == trialRespCommonResult.getData()){
-      throw new OperationFailedException("默认试算失败!");
-    }
     LOGGER.info("trialRespCommonResult = " + JsonUtil.toJson(trialRespCommonResult));
 
+    if (RESPCODE != trialRespCommonResult.getRespCode() || null == trialRespCommonResult.getData()) {
+      throw new OperationFailedException("默认试算失败!");
+    }
     return trialRespCommonResult;
   }
 
@@ -85,17 +97,24 @@ public class ChildrenInsuranceService extends QiXinOpenApiService {
     healthStatementReq.setGenes(geneParamList);
 
     CommonResult<HealthStatementResp> healthStatementRespCommonResult = operation.healthStatement(healthStatementReq);
-    if(null == healthStatementRespCommonResult.getData()){
+    LOGGER.info("healthStatementRespCommonResult = " + JsonUtil.toJson(healthStatementRespCommonResult));
+
+    if (RESPCODE != healthStatementRespCommonResult.getRespCode() || null == healthStatementRespCommonResult.getData()) {
       throw new OperationFailedException("获取健康告知失败!");
     }
-    LOGGER.info("healthStatementRespCommonResult = " + JsonUtil.toJson(healthStatementRespCommonResult));
 
     return JsonUtil.toJson(healthStatementRespCommonResult);
   }
 
+  /**
+   * 选定的试算因子
+   *
+   * @param geneParamValue 试算因子值
+   * @return
+   */
   private GeneParam getGeneParam(String geneParamValue) {
     GeneParam geneParam = new GeneParam();
-    geneParam.setProtectItemId("2383");
+    geneParam.setProtectItemId(PROTECTITEMID);
     geneParam.setSort(2);
     geneParam.setValue(geneParamValue);
     return geneParam;
@@ -119,23 +138,26 @@ public class ChildrenInsuranceService extends QiXinOpenApiService {
     submitHealthStateReq.setGenes(geneParamList);
 
     HealthyQa healthyQa = new HealthyQa();
-    healthyQa.setHealthyId(274);
+    healthyQa.setHealthyId(HEALTHYID);
 
     List<HealthyQaModule> healthyQaModuleList = new ArrayList<>();
     HealthyQaModule healthyQaModule = new HealthyQaModule();
-    healthyQaModule.setModuleId(157);
+    healthyQaModule.setModuleId(MODULEID);
 
     List<HealthyQaQuestion> healthyQaQuestionList = new ArrayList<>();
-    for (int questionId = 953; questionId <= 960; questionId++) {
+    Set<Integer> questionSet = QUESTIONS.keySet();
+
+    for (Iterator<Integer> iterator = questionSet.iterator(); iterator.hasNext(); ) {
+      Integer questionId = iterator.next();
       HealthyQaQuestion healthyQaQuestion = new HealthyQaQuestion();
       healthyQaQuestion.setQuestionId(questionId);
       healthyQaQuestion.setParentId(0);
-      healthyQaQuestion.setQuestionSort((byte) (questionId-952));
+      healthyQaQuestion.setQuestionSort(QUESTIONS.get(questionId).byteValue());
 
       List<HealthyQaAnswer> healthyQaAnswerList = new ArrayList<>();
 
       HealthyQaAnswer healthyQaAnswer = new HealthyQaAnswer();
-      healthyQaAnswer.setAnswerId(509);
+      healthyQaAnswer.setAnswerId(ANSWERID);
       healthyQaAnswer.setAnswerValue("0");
       healthyQaAnswer.setKeyCode("insured_isOrNot");
       healthyQaAnswerList.add(healthyQaAnswer);
@@ -155,12 +177,11 @@ public class ChildrenInsuranceService extends QiXinOpenApiService {
     submitHealthStateReq.setQaAnswer(healthyQa);
 
     CommonResult<SubmitHealthStateResp> submitHealthStateRespCommonResult = operation.submitHealthState(submitHealthStateReq);
+    LOGGER.info("submitHealthStateRespCommonResult = " + JsonUtil.toJson(submitHealthStateRespCommonResult));
 
-    if(null == submitHealthStateRespCommonResult.getData()){
+    if (RESPCODE != submitHealthStateRespCommonResult.getRespCode() || null == submitHealthStateRespCommonResult.getData()) {
       throw new OperationFailedException("提交健康告知失败!");
     }
-
-    LOGGER.info("submitHealthStateRespCommonResult = "+JsonUtil.toJson(submitHealthStateRespCommonResult));
 
     return submitHealthStateRespCommonResult;
 
@@ -169,17 +190,21 @@ public class ChildrenInsuranceService extends QiXinOpenApiService {
 
   /**
    * 存储投保信息
+   *
    * @param childrenInsuarnce 投保信息
    */
-  private ChildrenInsuarnce save(ChildrenInsuarnce childrenInsuarnce) {
-    childrenInsuarnce.setCreateDate(new Date());
-    if(isDebug){
+  private ChildrenInsuarnce save(ChildrenInsuarnce childrenInsuarnce, Long totalprice) {
+    if (isDebug) {
       //测试服
       childrenInsuarnce.setPayPrice(1);
-    }else{
+    } else {
       //正式服
       childrenInsuarnce.setPayPrice(childrenInsuarnce.getTotalPrice());
     }
+    //订单创建时间
+    childrenInsuarnce.setCreateDate(new Date());
+    //订单支付金额
+    childrenInsuarnce.setTotalPrice(totalprice);
     //订单状态
     childrenInsuarnce.setOrderStatus(ChildrenInsuarnce.OrderStatus.WAIT_PAY);
     return childrenInsuranceRepository.save(childrenInsuarnce);
@@ -187,7 +212,8 @@ public class ChildrenInsuranceService extends QiXinOpenApiService {
 
   /**
    * 投保
-   * @param childrenInsuarnce
+   *
+   * @param childrenInsuarnce 投保信息
    */
   private CommonResult<InsureResp> insure(ChildrenInsuarnce childrenInsuarnce) throws OperationFailedException {
     InsureReq insureReq = initBaseReq(InsureReq.class);
@@ -217,13 +243,8 @@ public class ChildrenInsuranceService extends QiXinOpenApiService {
     insurant.setSex(childrenInsuarnce.getInsurantSex());
     insurant.setRelationId(childrenInsuarnce.getRelation().getRelation());
     insurant.setCount(1);
-    if(isDebug){
-      //测试服
-      insurant.setSinglePrice(childrenInsuarnce.getTotalPrice());
-    }else {
-      //正式服
-      insurant.setSinglePrice(childrenInsuarnce.getPayPrice());
-    }
+
+    insurant.setSinglePrice(childrenInsuarnce.getTotalPrice());
     insurantList.add(insurant);
 
     insureReq.setInsurants(insurantList);
@@ -239,8 +260,9 @@ public class ChildrenInsuranceService extends QiXinOpenApiService {
     otherInfo.setHealthAnswerId((int) submitHealthStateRespCommonResult.getData().getHealthId());
     insureReq.setOtherInfo(otherInfo);
     CommonResult<InsureResp> insureRespCommonResult = operation.insure(insureReq);
-    LOGGER.info("insureRespCommonResult = "+JsonUtil.toJson(insureRespCommonResult));
-    if(null == insureRespCommonResult.getData()){
+    LOGGER.info("insureRespCommonResult = " + JsonUtil.toJson(insureRespCommonResult));
+
+    if (RESPCODE != insureRespCommonResult.getRespCode() || null == insureRespCommonResult.getData()) {
       throw new OperationFailedException("投保失败");
     }
 
@@ -250,14 +272,16 @@ public class ChildrenInsuranceService extends QiXinOpenApiService {
 
   /**
    * 投保并存储投保信息
+   *
    * @param childrenInsuarnce
    */
-  public CommonResult<InsureResp> insureAndSave(ChildrenInsuarnce childrenInsuarnce) throws OperationFailedException {
+  @Transactional
+  public CommonResult<InsureResp> insureAndSave(ChildrenInsuarnce childrenInsuarnce, Long totalprice) throws OperationFailedException {
     //存储投保信息
-    childrenInsuarnce = save(childrenInsuarnce);
+    childrenInsuarnce = save(childrenInsuarnce, totalprice);
     //调用慧泽SDK,进行投保
     CommonResult<InsureResp> insureRespCommonResult = insure(childrenInsuarnce);
-    if(null == insureRespCommonResult.getData() || null == insureRespCommonResult.getData().getInsureNum()){
+    if (null == insureRespCommonResult.getData() || null == insureRespCommonResult.getData().getInsureNum()) {
       throw new OperationFailedException("投保失败");
     }
     //添加投保单号
@@ -269,6 +293,7 @@ public class ChildrenInsuranceService extends QiXinOpenApiService {
 
   /**
    * 在线支付
+   *
    * @param childrenInsuarnce 投保信息
    */
   public ChildrenInsuarnce tryPay(ChildrenInsuarnce childrenInsuarnce) throws OperationFailedException {
@@ -277,9 +302,9 @@ public class ChildrenInsuranceService extends QiXinOpenApiService {
     //投保单号
     onlinePayReq.setInsureNums(childrenInsuarnce.getInsureNum());
     //订单支付总金额（单位：分）
-    if(isDebug){
+    if (isDebug) {
       onlinePayReq.setMoney(1);
-    }else {
+    } else {
       onlinePayReq.setMoney(childrenInsuarnce.getPayPrice());
     }
 
@@ -291,10 +316,10 @@ public class ChildrenInsuranceService extends QiXinOpenApiService {
     onlinePayReq.setCallBackUrl(childrenInsuranceConfig.getCallbackUrl() + childrenInsuarnce.getInsureNum());
 
     CommonResult<OnlinePayResp> onlinePayRespCommonResult = operation.onlinePay(onlinePayReq);
-    LOGGER.info("onlinePayRespCommonResult = "+JsonUtil.toJson(onlinePayRespCommonResult));
+    LOGGER.info("onlinePayRespCommonResult = " + JsonUtil.toJson(onlinePayRespCommonResult));
 
-    if(null == onlinePayRespCommonResult.getData() || null == onlinePayRespCommonResult.getData().getGatewayUrl()){
-      throw new OperationFailedException("在线支付失败");
+    if (RESPCODE != onlinePayRespCommonResult.getRespCode() || null == onlinePayRespCommonResult.getData() || null == onlinePayRespCommonResult.getData().getGatewayUrl()) {
+      throw new OperationFailedException(onlinePayRespCommonResult.getRespMsg());
     }
     //更新投保信息 增加支付链接
     childrenInsuarnce.setPayUrl(onlinePayRespCommonResult.getData().getGatewayUrl());
@@ -308,15 +333,19 @@ public class ChildrenInsuranceService extends QiXinOpenApiService {
    * @param insureNum 投保单号
    * @return
    */
-  public String download(String insureNum) {
+  public String download(String insureNum) throws OperationFailedException {
     PolicyUrlReq policyUrlReq = initBaseReq(PolicyUrlReq.class);
     policyUrlReq.setInsureNum(insureNum);
 
     CommonResult<PolicyUrlResp> policyUrlRespCommonResult = operation.downloadUrl(policyUrlReq);
+    LOGGER.info("policyUrlRespCommonResult = " + JsonUtil.toJson(policyUrlRespCommonResult));
+
+    if (RESPCODE != policyUrlRespCommonResult.getRespCode()) {
+      throw new OperationFailedException("保单地址查询失败");
+    }
 
     return JsonUtil.toJson(policyUrlRespCommonResult);
   }
-
 
 
   /**

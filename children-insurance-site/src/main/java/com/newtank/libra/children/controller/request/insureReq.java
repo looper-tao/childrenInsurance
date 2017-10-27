@@ -51,9 +51,8 @@ public class InsureReq {
   private int insurantSex;
   //与投保人关系
   private ChildrenInsuarnce.Relation relation;
-  //投保金额
-  private long totalPrice;
   //基本保额
+  @NotNull(message = "基本保额不能为空")
   private String genes;
   @NotNull(message = "验证码不能为空！")
   private String vcode;
@@ -77,8 +76,7 @@ public class InsureReq {
     childrenInsuarnce.setInsurantBirthday(this.insurantBirthday);
     childrenInsuarnce.setInsurantSex(this.insurantSex);
     childrenInsuarnce.setRelation(this.relation);
-    childrenInsuarnce.setTotalPrice(this.totalPrice);
-    childrenInsuarnce.setGenes(this.genes+"万元");
+    childrenInsuarnce.setGenes(this.genes);
 
     return childrenInsuarnce;
   }
